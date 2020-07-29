@@ -2,6 +2,7 @@ using Leaf.xNet;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace Youtube_Viewers.Helpers
 {
@@ -14,6 +15,8 @@ namespace Youtube_Viewers.Helpers
             "https://www.proxy-list.download/api/v1/get?type=socks4"
         };
 
+        public static Regex Proxy_re { get; private set; } = new Regex(@"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):[0-9]{1,5}\b", RegexOptions.Compiled);
+        
         public int Time { get; private set; } = (int)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
         public string FileName { get; private set; }
 
@@ -50,12 +53,9 @@ namespace Youtube_Viewers.Helpers
 
         private void fromFile()
         {
-            List<string> proxies = new List<string>();
+            string res = File.ReadAllText(FileName);
 
-            foreach (string proxy in File.ReadAllText(FileName).Trim().Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None))
-            {
-                proxies.Add(proxy.ToLower().Trim());
-            }
+            List<string> proxies = GetProxies(res);
 
             Proxies = Proxy.GetList(proxies);
         }
@@ -69,10 +69,8 @@ namespace Youtube_Viewers.Helpers
                 {
                     try
                     {
-                        string[] res = req.Get(url).ToString().Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
-                        foreach (string proxy in res)
-                            if (!proxies.Contains(proxy.Trim()))
-                                proxies.Add(proxy.Trim());
+                        string res = req.Get(url).ToString();
+                        GetProxies(res).ForEach(proxies.Add);
                     }
                     catch { }
                 }
@@ -80,6 +78,21 @@ namespace Youtube_Viewers.Helpers
 
             Proxies = Proxy.GetList(proxies);
             Time = (int)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
+        }
+
+        private List<string> GetProxies(string str) 
+        {
+            List<string> res = new List<string>();
+        	try
+        	{
+        		foreach(Match proxy in Proxy_re.Matches(str))
+        		    if(!res.Contains(proxy.Value))
+        		        res.Add(proxy.Value);
+        	}
+        	catch 
+        	{ 
+        	    return res;
+        	}
         }
     }
 }
